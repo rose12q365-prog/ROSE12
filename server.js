@@ -3,6 +3,21 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+// server.js - backend for fake coins cricket game
+require('dotenv').config();
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+
+// ⭐⭐ Add this line (CORS import)
+const cors = require('cors');
+
+const app = express();
+
+// ⭐⭐ Add this (enable CORS)
+app.use(cors({ origin: '*' }));
+
+app.use(express.json());
 
 const app = express();
 app.use(express.json());
