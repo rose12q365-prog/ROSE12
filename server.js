@@ -3,23 +3,12 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-// server.js - backend for fake coins cricket game
-require('dotenv').config();
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-
-// ⭐⭐ Add this line (CORS import)
 const cors = require('cors');
 
 const app = express();
 
-// ⭐⭐ Add this (enable CORS)
+// allow all origins for now (demo)
 app.use(cors({ origin: '*' }));
-
-app.use(express.json());
-
-const app = express();
 app.use(express.json());
 
 // In-memory data (restart hone par reset ho jayega – demo ke liye ok)
@@ -29,17 +18,14 @@ const tokens = {};         // token -> { room, matchId, createdBy }
 const matchToRooms = {};   // matchId -> [room names]
 const withdrawRequests = [];
 
-// initial coins per new user
 const INITIAL_COINS = Number(process.env.INITIAL_COINS || 1000);
 
-// Simple health check
+// health check
 app.get('/', (req, res) => {
   res.send('OK - server running');
 });
 
-// ------------ TOKEN / ROOM CREATION ---------------
-
-// Create a new token / room for match
+// ---------- TOKEN / ROOM CREATION -----------
 app.post('/create', (req, res) => {
   const { matchId, createdBy } = req.body || {};
   const token = (Math.random() + 1).toString(36).substring(2, 10);
@@ -61,8 +47,7 @@ app.post('/create', (req, res) => {
   });
 });
 
-// -------------- LIVE EVENT SIMULATION ----------------
-
+// ---------- LIVE EVENT SIMULATION -----------
 app.post('/simulate', (req, res) => {
   const { matchId, over, runs, wicket, message } = req.body || {};
   if (!matchId) {
@@ -84,9 +69,9 @@ app.post('/simulate', (req, res) => {
   return res.json({ ok: true, event, rooms });
 });
 
-// -------------- USER + COINS SYSTEM ------------------
+// ---------- USER + COINS SYSTEM -------------
 
-// Create user with starting coins
+// Create user
 app.post('/user/create', (req, res) => {
   const { name } = req.body || {};
   const id = String(nextUserId++);
@@ -98,7 +83,7 @@ app.post('/user/create', (req, res) => {
   return res.json({ user: users[id] });
 });
 
-// Player action: play a round, spend coins
+// Player action: play round (cost 20 coins)
 app.post('/player-action', (req, res) => {
   const { token, userId, action } = req.body || {};
 
@@ -110,9 +95,8 @@ app.post('/player-action', (req, res) => {
   }
 
   const user = users[userId];
-
-  // For now, sirf ek action: "play" – cost 20 coins
   const COST_PER_PLAY = 20;
+
   if (action === 'play') {
     if (user.coins < COST_PER_PLAY) {
       return res.status(400).json({ error: 'INSUFFICIENT_COINS', coins: user.coins });
@@ -123,13 +107,12 @@ app.post('/player-action', (req, res) => {
   }
 
   const room = tokens[token].room;
-  // broadcast balance update to everyone in room
   io.to(room).emit('balanceUpdate', { userId, coins: user.coins });
 
   return res.json({ ok: true, coins: user.coins });
 });
 
-// Request withdraw (demo – only records request and deducts coins)
+// Withdraw request (demo)
 app.post('/withdraw', (req, res) => {
   const { userId, amount } = req.body || {};
   const amt = Number(amount || 0);
@@ -140,6 +123,7 @@ app.post('/withdraw', (req, res) => {
   if (!amt || amt <= 0) {
     return res.status(400).json({ error: 'INVALID_AMOUNT' });
   }
+
   const user = users[userId];
   if (user.coins < amt) {
     return res.status(400).json({ error: 'INSUFFICIENT_COINS', coins: user.coins });
@@ -156,17 +140,18 @@ app.post('/withdraw', (req, res) => {
   };
   withdrawRequests.push(reqObj);
 
-  // optional: emit event
   io.emit('withdrawRequest', reqObj);
 
   return res.json({ ok: true, request: reqObj, coins: user.coins });
 });
 
-// ------------ SOCKET.IO SETUP ------------------------
-
+// ---------- SOCKET.IO SETUP -----------------
 const server = http.createServer(app);
+
 const io = new Server(server, {
-  cors: { origin: true }
+  cors: {
+    origin: '*'
+  }
 });
 
 io.on('connection', socket => {
@@ -187,8 +172,7 @@ io.on('connection', socket => {
   });
 });
 
-// ------------ START SERVER ---------------------------
-
+// ---------- START SERVER --------------------
 const PORT = Number(process.env.PORT || 3000);
 server.listen(PORT, () => {
   console.log(`Backend listening on port ${PORT}`);
